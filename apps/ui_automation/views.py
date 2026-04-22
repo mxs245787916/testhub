@@ -3242,7 +3242,10 @@ def smart_complete_remaining_tasks(planned_tasks, execution_logs):
     # 检查是否有 pending 任务
     pending_tasks = [t for t in planned_tasks if t.get('status', 'pending') in ACTIVE_TASK_STATUSES]
     if not pending_tasks:
+        logger.info("🔍 smart_complete: 没有 pending 任务需要补齐")
         return []
+
+    logger.info(f"🔍 smart_complete: 发现 {len(pending_tasks)} 个 pending 任务待补齐")
 
     # 验证/检查类任务必须显式标记，禁止自动补齐
     verification_keywords = ['校验', '确认', '检查', '验证', '断言', 'verify', 'check', 'assert']
@@ -3252,10 +3255,12 @@ def smart_complete_remaining_tasks(planned_tasks, execution_logs):
         task_desc = str(task.get('description', '')).lower()
         # 跳过验证类任务
         if any(k in task_desc for k in verification_keywords):
+            logger.info(f"⚠️ smart_complete: 跳过验证类任务 {task.get('id')}: {task.get('description')}")
             continue
         # 其他任务全部补齐为 completed
         task['status'] = 'completed'
         completed_ids.append(task.get('id'))
+        logger.info(f"✅ smart_complete: 补齐任务 {task.get('id')}: {task.get('description')}")
 
     return completed_ids
 
