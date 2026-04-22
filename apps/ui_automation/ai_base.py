@@ -1627,10 +1627,10 @@ class BaseBrowserAgent:
         final_task = task_description
         if planned_tasks:
             final_task += "\n\nIMPORTANT INSTRUCTION:\n"
-            final_task += "You have a list of sub-tasks. Execute strictly in order.\n"
-            final_task += "CRITICAL: MUST call one of 'mark_task_complete', 'mark_task_failed', 'mark_task_skipped', or 'update_task_status(task_id=..., status=...)' IMMEDIATELY after determining each sub-task result. NEVER skip this step.\n"
-            final_task += "IMPORTANT: If a sub-task (like opening a URL) is already fulfilled by the initial state, YOU MUST mark it complete in your VERY FIRST STEP.\n"
-            final_task += "Sub-tasks (Execute in order):\n"
+            final_task += "You have a list of sub-tasks numbered from 1 to N. Execute STRICTLY ONE TASK PER STEP.\n"
+            final_task += "CRITICAL RULE: After completing EACH sub-task (including clicking login button), you MUST immediately call mark_task_complete with that task's ID.\n"
+            final_task += "NEVER combine multiple sub-tasks into one step. Each click, each input, each action belongs to ONE specific sub-task.\n"
+            final_task += "Sub-tasks (Execute ONE at a time, mark complete after EACH):\n"
             cleaned_tasks = []
             for t in planned_tasks:
                 desc = t['description']
@@ -1644,44 +1644,16 @@ class BaseBrowserAgent:
 
         # 极限效率版标记指令
         from datetime import datetime
-        final_task += f"\n\nCURRENT TIME: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        final_task += "\nCRITICAL PERFORMANCE & SYNC RULES:\n"
-        final_task += "1. TASK COMPLETION MARKING RULES:\n"
-        final_task += "   a) MARK AFTER COMPLETION: Call 'mark_task_complete(task_id=N)' ONLY AFTER you have SUCCESSFULLY COMPLETED task N.\n"
-        final_task += "   b) MARK CURRENT TASK: Always mark the task you just completed, NOT the next task or previous tasks.\n"
-        final_task += "   c) CHECK TASK ID: Before marking, verify: 'I just completed task N' - if N is already marked, check which task you actually completed.\n"
-        final_task += "   d) DO NOT SKIP: Every sub-task must end with an explicit terminal status update: completed, failed, or skipped.\n"
-        final_task += "   e) EXAMPLE SUCCESS: [{click: {...}}, {mark_task_complete: {task_id: 4}}]\n"
-        final_task += "   f) EXAMPLE FAILURE: if task 4 cannot be completed after verification, call {mark_task_failed: {task_id: 4}}.\n"
-        final_task += "   g) EXAMPLE SKIP: if task 4 is intentionally unnecessary, call {mark_task_skipped: {task_id: 4}}.\n"
-        final_task += "   h) NO PRE-MARKING: Never mark a task before completing it. Never mark a task twice.\n"
-        final_task += "   i) SINGLE-TASK STEP: If you mark task N in the current step, STOP there. Do NOT start task N+1 in the same step.\n"
-        final_task += "   j) FORM EXAMPLE: Good: [{input: {...}}, {mark_task_complete: {task_id: 2}}] then next step handles task 3. Bad: [{mark_task_complete: {task_id: 1}}, {input: {...task 2...}}].\n"
-        final_task += "2. NO JAVASCRIPT IN INPUT: When a task asks for a timestamp, YOU MUST compute the final string yourself (e.g., 'V8.01734892400').\n"
-        final_task += "   - DO NOT output 'Date.now()' or '{{...}}' strings. Use the CURRENT TIME provided above to estimate a timestamp.\n"
-        final_task += "3. DROPDOWN & MODAL ISOLATION: If an action (clicking a button/dropdown) triggers a UI change (modal opens/dropdown expands), YOU MUST STOP and WAIT for the next step to see the new elements. DO NOT attempt to interact with newly appeared elements (like dropdown options) in the same step as the click that opened them.\n"
-        final_task += "4. TAB HANDLING: If clicking a link/result opens a new tab, DO NOT click the same result again. Immediately switch to the newest tab, verify the detail page there, then mark the current sub-task complete.\n"
-        final_task += "5. ULTRALIGHT THINKING: Keep 'thinking' under 10 words. Just list next actions. Merge multiple INPUTS if they are on the same form, but NEVER merge a UI-opening click with its subsequent interaction. SPEED IS CRITICAL - respond as quickly as possible.\n"
-        final_task += "6. FORM VALIDATION & ERROR DETECTION: When filling forms, you MUST:\n"
-        final_task += "   a) Check for RED TEXT messages (validation errors) before clicking save/submit\n"
-        final_task += "   b) If validation errors exist, COMPLETE ALL MISSING FIELDS first, then retry save\n"
-        final_task += "   c) NEVER close a dialog/modal if there are validation errors - complete the form instead\n"
-        final_task += "   d) Verify all required fields are filled before attempting to save\n"
-        final_task += "   e) Common validation errors: missing required fields (red asterisk or red text), invalid format, etc.\n"
-        final_task += "7. RETRY LOGIC: If a previous 'save' or 'submit' failed (e.g., error toast or validation error):\n"
-        final_task += "   a) STOP and examine the page for validation errors (red text, error messages)\n"
-        final_task += "   b) RE-VERIFY all fields - check dropdowns are actually selected, not just clicked\n"
-        final_task += "   c) Re-select dropdowns and re-input text to ensure the form is complete\n"
-        final_task += "   d) DO NOT close the dialog - stay and complete all missing fields\n"
-        final_task += "   e) Often errors are caused by: missing project selection, unfilled required fields, incorrect format\n"
-        final_task += "8. DO NOT REPEAT: If a task is complete, mark it and MOVE ON. Never click the same search result or link twice unless you verified the first click failed.\n"
-        final_task += "9. VERIFICATION: Task 15/16 usually require checking the list. Ensure you are on the correct page and the new data is visible before marking complete.\n"
-        final_task += "10. ELEMENT IDENTIFICATION: Carefully identify elements before clicking. AVOID clicking 'close' or 'cancel' buttons when filling forms. Check button labels, aria-labels, and icons to ensure you're clicking the correct element.\n"
-        final_task += "11. ACTION PARAM FORMAT: For browser actions, always use browser-use native parameter names. Use 'index' for click/input/select actions, use 'text' for typed content, and never use aliases like 'element_id'.\n"
-        final_task += "12. CREDENTIALS RULE: NEVER invent, replace, or guess credentials. Only use the username/password explicitly provided in the task. If login keeps failing with an explicit error like '登录失败' or '用户名或密码错误', stop retrying after a small number of attempts and mark the current login task as failed.\n"
+        final_task += f"\n\nTIME: {datetime.now().strftime('%H:%M:%S')}\n"
+        final_task += "\nCRITICAL TASK RULES:\n"
+        final_task += "1. ONE TASK PER STEP: Action + mark_task_complete(task_id=N). NEVER skip.\n"
+        final_task += "2. LOGIN EXAMPLE: task1=go_to_url+mark(task1), task2=input+mark(task2), task3=input+mark(task3), task4=click+mark(task4)\n"
+        final_task += "3. NEVER MERGE: Each task needs its OWN mark_task_complete call. Marking task1 but doing task2/3=FAILURE.\n"
+        final_task += "4. DROPDOWN: Wait for next step after clicking dropdown.\n"
+        final_task += "5. ERROR CHECK: Check red text before clicking save/submit.\n"
 
         if 'qwen' in self.model_name.lower() or 'deepseek' in self.model_name.lower():
-            final_task += "13. EXTREMELY MINIMIZE output tokens for speed. Keep responses as short as possible while maintaining accuracy.\n"
+            final_task += "6. Be concise. Keep thinking under 10 words.\n"
 
         # 核心修复: 清理 task 长文本中的 URL，防止中文标点紧贴 URL 导致 browser-use 解析错误
         # 例如 "http://localhost:3000，" -> "http://localhost:3000 "

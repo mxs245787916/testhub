@@ -2995,6 +2995,14 @@ class AICaseViewSet(viewsets.ModelViewSet):
                     execution_record.status = 'stopped'
                     execution_record.logs += "\n[System] 任务已由用户停止。"
                 else:
+                    # 智能收尾：如果执行结束但有 pending 任务，尝试补齐
+                    remaining_ids = smart_complete_remaining_tasks(
+                        execution_record.planned_tasks,
+                        execution_record.logs
+                    )
+                    if remaining_ids:
+                        logger.info(f"🔧 智能补齐了以下任务: {remaining_ids}")
+
                     execution_record.status, task_summary = resolve_execution_status(execution_record.planned_tasks)
                     if execution_record.status == 'passed':
                         execution_record.logs += "\n执行完成。"
@@ -3201,6 +3209,11 @@ def backfill_prior_pending_tasks(planned_tasks, current_task_id):
         (['搜索'], ['点击第', '点击第2条', '点击第二条', '查看详情']),
         (['点击第', '点击第2条', '点击第二条', '查看详情'], ['关闭', '关闭该标签页', '关闭标签页']),
         (['打开详情', '查看详情'], ['关闭', '返回']),
+        # 登录场景：输入账号 → 输入密码 → 点击登录
+        (['账号', '用户名', '账户'], ['密码', 'password']),
+        (['密码', 'password'], ['登录', '登录按钮', '确认']),
+        # 通用表单填写：上一个输入 → 下一个输入/点击
+        (['输入'], ['输入', '点击', '选择', '提交']),
     ]
 
     def matches_any(text, keywords):
@@ -3216,6 +3229,35 @@ def backfill_prior_pending_tasks(planned_tasks, current_task_id):
 
     previous_task['status'] = 'completed'
     return [current_task_id_int - 1]
+
+
+def smart_complete_remaining_tasks(planned_tasks, execution_logs):
+    """
+    智能补齐剩余任务：当执行结束时，自动完成所有 pending 的非验证类任务。
+    核心思路：如果执行器已经没有任何后续操作了，所有剩余任务都应该被标记完成。
+    """
+    if not planned_tasks:
+        return []
+
+    # 检查是否有 pending 任务
+    pending_tasks = [t for t in planned_tasks if t.get('status', 'pending') in ACTIVE_TASK_STATUSES]
+    if not pending_tasks:
+        return []
+
+    # 验证/检查类任务必须显式标记，禁止自动补齐
+    verification_keywords = ['校验', '确认', '检查', '验证', '断言', 'verify', 'check', 'assert']
+    
+    completed_ids = []
+    for task in pending_tasks:
+        task_desc = str(task.get('description', '')).lower()
+        # 跳过验证类任务
+        if any(k in task_desc for k in verification_keywords):
+            continue
+        # 其他任务全部补齐为 completed
+        task['status'] = 'completed'
+        completed_ids.append(task.get('id'))
+
+    return completed_ids
 
 
 def mark_first_active_task(planned_tasks, task_status):
@@ -3521,6 +3563,14 @@ class AIExecutionRecordViewSet(viewsets.ModelViewSet):
                     execution_record.status = 'stopped'
                     execution_record.logs += "\n[System] 任务已由用户停止。"
                 else:
+                    # 智能收尾：如果执行结束但有 pending 任务，尝试补齐
+                    remaining_ids = smart_complete_remaining_tasks(
+                        execution_record.planned_tasks,
+                        execution_record.logs
+                    )
+                    if remaining_ids:
+                        logger.info(f"🔧 智能补齐了以下任务: {remaining_ids}")
+
                     execution_record.status, task_summary = resolve_execution_status(execution_record.planned_tasks)
                     if execution_record.status == 'passed':
                         execution_record.logs += "\n执行完成。"
